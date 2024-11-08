@@ -1,4 +1,3 @@
-# podgrab.py
 
 import os
 import sys
@@ -12,10 +11,12 @@ from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse
 from tqdm import tqdm
+import whisper
+import torch
+import time
 
 app = typer.Typer()
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -186,6 +187,57 @@ def download(
         typer.echo("An unexpected error occurred. Please check the log file for details.")
         sys.exit(1)
 
+@app.command()
+def transcribe(
+    audio_file: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        help="Path to the audio file to transcribe"
+    ),
+    model_name: str = typer.Option(
+        "base",
+        "--model",
+        "-m",
+        help="Name of the Whisper model to use (e.g., tiny, base, small, medium, large)"
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="File to save the transcription (defaults to printing to console)"
+    )
+):
+    """
+    Transcribe an audio file using OpenAI's Whisper model.
+    """
+    try:
+        device = get_device()
+        logging.info(f"Using device: {device}")
+
+        logging.info(f"Loading Whisper model '{model_name}'")
+        model = whisper.load_model(model_name, device=device)
+
+        logging.info(f"Transcribing audio file '{audio_file}'")
+
+        result = model.transcribe(str(audio_file), fp16=False)
+
+        transcription = result['text']
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(transcription)
+            typer.echo(f"Transcription saved to '{output_file}'")
+        else:
+            typer.echo(transcription)
+
+    except Exception as e:
+        logging.exception("An error occurred during transcription.")
+        typer.echo("An error occurred during transcription. Please check the log file for details.")
+        sys.exit(1)
+
 def search_podcast(podcast_name: str) -> List[dict]:
     """
     Search for podcasts using the iTunes Search API.
@@ -336,6 +388,17 @@ def download_audio(url: str, output_path: Path):
         logging.exception("Error occurred while downloading the audio file.")
         typer.echo("Network error occurred while downloading the audio file.")
         sys.exit(1)
+
+
+def get_device():
+    """
+    Returns the best available device: CUDA or CPU.
+    Excludes MPS due to current limitations with sparse tensors.
+    """
+    if torch.cuda.is_available():
+        return 'cuda'
+    else:
+        return 'cpu'
 
 if __name__ == "__main__":
     app()
