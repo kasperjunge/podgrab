@@ -1,4 +1,3 @@
-
 import os
 import sys
 import logging
@@ -11,6 +10,7 @@ from urllib.parse import urlparse
 from tqdm import tqdm
 import whisper
 import torch
+import yt_dlp
 
 app = typer.Typer()
 
@@ -176,6 +176,59 @@ def download(
 
         # Download the audio file
         download_audio(audio_url, full_file_path)
+
+        typer.echo("Download completed successfully.")
+
+    except Exception as e:
+        logging.exception("An unexpected error occurred.")
+        typer.echo("An unexpected error occurred. Please check the log file for details.")
+        sys.exit(1)
+
+@app.command()
+def youtube(
+    url: str = typer.Argument(..., help="YouTube video URL"),
+    output_path: Path = typer.Option(
+        '.', '--output', '-o', help="Output directory for the downloaded file"
+    ),
+    non_interactive: bool = typer.Option(
+        False, '--non-interactive', help="Run in non-interactive mode"
+    )
+):
+    """
+    Download audio from a YouTube video.
+
+    This command downloads the audio from the specified YouTube video URL
+    and saves it to the output directory.
+
+    Args:
+        url (str): The YouTube video URL.
+        output_path (Path): Directory where the downloaded file will be saved.
+        non_interactive (bool): Run without interactive prompts (automatic selections).
+
+    Raises:
+        SystemExit: Exits the program if an error occurs.
+    """
+    try:
+        # Input validation
+        url = url.strip()
+
+        if not url:
+            logging.error("YouTube URL cannot be empty.")
+            typer.echo("Error: YouTube URL cannot be empty.")
+            sys.exit(1)
+
+        if not output_path.is_dir():
+            logging.error(f"The output path '{output_path}' is not a valid directory.")
+            typer.echo(f"Error: The output path '{output_path}' is not a valid directory.")
+            sys.exit(1)
+
+        if not os.access(output_path, os.W_OK):
+            logging.error(f"The output path '{output_path}' is not writable.")
+            typer.echo(f"Error: The output path '{output_path}' is not writable.")
+            sys.exit(1)
+
+        # Download audio from YouTube
+        download_youtube_audio(url, output_path, non_interactive)
 
         typer.echo("Download completed successfully.")
 
@@ -386,6 +439,53 @@ def download_audio(url: str, output_path: Path):
         typer.echo("Network error occurred while downloading the audio file.")
         sys.exit(1)
 
+def download_youtube_audio(url: str, output_path: Path, non_interactive: bool):
+    """
+    Download audio from a YouTube video using yt_dlp.
+
+    Args:
+        url (str): The URL of the YouTube video.
+        output_path (Path): The directory where the audio will be saved.
+        non_interactive (bool): Run without interactive prompts.
+
+    Raises:
+        SystemExit: Exits the program if an error occurs during download.
+    """
+    try:
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': str(output_path / '%(title)s.%(ext)s'),
+            'noplaylist': True,
+            'quiet': non_interactive,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'progress_hooks': [youtube_progress_hook],
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        logging.info(f"Downloaded audio from YouTube video '{url}' to '{output_path}'")
+
+    except yt_dlp.utils.DownloadError as e:
+        logging.exception("Error occurred while downloading audio from YouTube.")
+        typer.echo("An error occurred while downloading audio from YouTube.")
+        sys.exit(1)
+
+def youtube_progress_hook(d):
+    """
+    Hook to report download progress for YouTube downloads.
+
+    Args:
+        d (dict): Download progress dictionary from yt_dlp.
+    """
+    if d['status'] == 'finished':
+        typer.echo('Download complete, now converting...')
+    elif d['status'] == 'downloading':
+        pass  # Here you can add code to display progress if desired
 
 def get_device():
     """
