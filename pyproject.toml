@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "podgrab"
-version = "0.1.1"
+version = "0.1.2"
 description = "CLI tool for downloading and transcribing podcasts."
 authors = ["Kasper Junge <kasperjuunge@gmail.com>"]
 license = "MIT"
@@ -13,15 +13,15 @@ requests = "^2.32.3"
 feedparser = "^6.0.11"
 rich = "^13.9.4"
 tqdm = "^4.67.0"
-pytest = "^8.3.3"
-pytest-mock = "^3.14.0"
-llvmlite = "0.40.0rc1"
-numba = "0.57.0"
 openai-whisper = "^20240930"
 torch = "^2.5.1"
 torchvision = "^0.20.1"
 torchaudio = "^2.5.1"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+pytest-mock = "^3.14.0"
 
 [build-system]
 requires = ["poetry-core"]
