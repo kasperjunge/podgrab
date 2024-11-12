@@ -3,17 +3,14 @@ import os
 import sys
 import logging
 import requests
-import json
 import feedparser
 import typer
 from typing import List, Optional
 from pathlib import Path
-from datetime import datetime
 from urllib.parse import urlparse
 from tqdm import tqdm
 import whisper
 import torch
-import time
 
 app = typer.Typer()
 
